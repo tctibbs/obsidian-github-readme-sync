@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Build output
+main.js
+*.js.map
+
+# TypeScript
+*.tsbuildinfo
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Development
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Npm cache directory
+.npm
+
+# Eslint cache
+.eslintcache

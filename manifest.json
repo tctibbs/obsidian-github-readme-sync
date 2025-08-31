@@ -1,0 +1,11 @@
+{
+	"id": "github-readme-sync",
+	"name": "GitHub Readme Sync",
+	"version": "0.1.0",
+	"minAppVersion": "0.15.0",
+	"description": "Sync GitHub repositories' Markdown files (README, docs, etc.) to your Obsidian vault with full folder structure mirroring",
+	"author": "Your Name",
+	"authorUrl": "https://github.com/yourusername",
+	"fundingUrl": "https://github.com/sponsors/yourusername",
+	"isDesktopOnly": true
+}
