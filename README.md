@@ -1,5 +1,7 @@
 # GitHub Readme Sync 📚
 
+![Banner](assets/banner.png)
+
 An Obsidian plugin that syncs your GitHub repositories' Markdown files to your vault. One-way sync (GitHub → Obsidian) that preserves folder structure and keeps your project docs organized.
 
 ## Features
