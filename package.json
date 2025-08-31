@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-github-readme-sync",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"description": "Obsidian plugin for syncing GitHub repositories' Markdown files to your vault",
 	"main": "main.js",
 	"scripts": {
@@ -16,7 +16,7 @@
 		"markdown",
 		"readme"
 	],
-	"author": "Your Name",
+	"author": "Tristan Tibbs",
 	"license": "MIT",
 	"devDependencies": {
 		"@types/micromatch": "^4.0.9",
