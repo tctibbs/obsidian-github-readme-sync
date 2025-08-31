@@ -1,17 +1,17 @@
-# GitHub Readme Sync
+# GitHub Readme Sync 📚
 
-An Obsidian plugin that performs **one-way sync** (GitHub → Obsidian) of your repositories' Markdown files (README.md, docs, subfolders, etc.) while preserving the complete folder structure. Perfect for keeping project documentation accessible in your knowledge vault.
+An Obsidian plugin that syncs your GitHub repositories' Markdown files to your vault. One-way sync (GitHub → Obsidian) that preserves folder structure and keeps your project docs organized.
 
 ## Features
 
-- **Auto-discovery**: Automatically finds all repositories under configured GitHub usernames/organizations
-- **Full Structure Mirroring**: Preserves complete repo folder structure so relative links and images work seamlessly
-- **Flexible Filtering**: Include/exclude private repos, forks, archived repos, and use glob patterns for repo names
-- **Media File Support**: Optionally sync images, GIFs, and other media files (png, jpg, gif, svg, etc.)
-- **Private Repository Support**: Sync private repositories with proper GitHub token permissions
-- **Read-Only Protection**: Adds frontmatter and banner to mark synced files as read-only
-- **Configurable Sync**: Manual "Sync now" command and optional periodic auto-sync
-- **Smart Organization**: Files are written to `Projects/<owner>/<repo>/<repo-path>`
+- 🔍 **Auto-discovery** - Finds repositories from your GitHub username/organization
+- 📁 **Structure mirroring** - Preserves repo folder structure so links work
+- 🎯 **Filtering** - Include/exclude private repos, forks, archived repos with glob patterns  
+- 🖼️ **Media files** - Sync images, videos, and other media files (optional)
+- 🔒 **Private repos** - Access private repositories with GitHub token
+- ⚠️ **Read-only protection** - Marks synced files to prevent accidental edits
+- ⚡ **Manual + auto sync** - "Sync now" command and periodic background sync
+- 📂 **Organization** - Files go to `Projects/<owner>/<repo>/<path>`
 
 ## Installation (Development)
 
@@ -88,22 +88,22 @@ Each synced Markdown file includes:
 
 - **GitHub Readme Sync: Sync Now** - Manually trigger a full sync of all configured repositories
 
-## GitHub Token Setup
+## GitHub Token Setup 🔑
 
-The plugin requires a GitHub Personal Access Token with appropriate scopes:
+You need a GitHub Personal Access Token to use this plugin:
 
 1. Go to https://github.com/settings/tokens
 2. Click "Generate new token (classic)"
-3. Give it a name like "Obsidian Sync"
-4. Select the appropriate scopes:
-   - **`public_repo`** - For public repositories only
-   - **`repo`** - For both public and private repositories (recommended)
-5. Set an expiration date (recommended)
-6. Copy the token and paste it into the plugin settings
+3. Name it "Obsidian Sync" or similar
+4. Select scopes:
+   - `public_repo` - For public repositories only
+   - `repo` - For both public and private repositories  
+5. Set expiration date
+6. Copy token to plugin settings
 
-**Token Scopes:**
-- **Public repos only**: Use `public_repo` scope
-- **Private repos**: Requires full `repo` scope (includes `public_repo`)
+**Scope guide:**
+- Public repos only → `public_repo` scope
+- Private repos → `repo` scope (includes public)
 
 ## Limitations
 
@@ -119,11 +119,11 @@ The plugin requires a GitHub Personal Access Token with appropriate scopes:
 - **Audio files** (optional): `.mp3`, `.wav`
 - **Documents** (optional): `.pdf`
 
-## Future Features
+## Future Features 🚀
 
-- **Official Obsidian Plugin Directory** - Submit to community plugins for easier installation
-- **Custom file type filters** - Configure which file types to sync
-- **Mobile support** - Potential Obsidian Mobile compatibility (may not be feasible due to API limitations; Obsidian Sync may be a better solution)
+- 📦 **Official plugin directory** - Submit to community plugins for easier installation  
+- 🎛️ **Custom file filters** - Configure which file types to sync
+- 📱 **Mobile support** - May not be feasible due to API limitations (Obsidian Sync might be better)
 
 ## License
 
