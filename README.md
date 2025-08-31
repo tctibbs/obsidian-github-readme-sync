@@ -20,7 +20,7 @@ An Obsidian plugin that syncs your GitHub repositories' Markdown files to your v
 1. Clone this repository to your Obsidian vault's plugins folder:
    ```bash
    cd /path/to/your/vault/.obsidian/plugins
-   git clone https://github.com/yourusername/obsidian-github-readme-sync.git
+   git clone https://github.com/tctibbs/obsidian-github-readme-sync.git
    cd obsidian-github-readme-sync
    ```
 
