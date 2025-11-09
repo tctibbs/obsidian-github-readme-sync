@@ -28,6 +28,7 @@ export interface GitHubReadmeSyncSettings {
 	baseFolder: string;
 	syncMediaFiles: boolean;
 	lastSyncedRepos: string[]; // Track previously synced repos for cleanup
+	lastSyncTime: number | null; // Unix timestamp in milliseconds of last successful sync
 }
 
 export const DEFAULT_SETTINGS: GitHubReadmeSyncSettings = {
@@ -48,7 +49,8 @@ export const DEFAULT_SETTINGS: GitHubReadmeSyncSettings = {
 	pruneExtraneousFiles: false,
 	baseFolder: 'Projects',
 	syncMediaFiles: false,
-	lastSyncedRepos: []
+	lastSyncedRepos: [],
+	lastSyncTime: null
 };
 
 export class GitHubReadmeSyncSettingTab extends PluginSettingTab {
@@ -238,6 +240,41 @@ export class GitHubReadmeSyncSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}
 				}));
+
+		// Sync Status section
+		if (this.plugin.settings.autoSync) {
+			containerEl.createEl('h4', { text: 'Sync Status', cls: 'setting-item-heading' });
+
+			// Last sync time
+			const lastSyncDesc = this.plugin.settings.lastSyncTime
+				? this.plugin.formatTimeAgo(this.plugin.settings.lastSyncTime)
+				: 'Never';
+
+			new Setting(containerEl)
+				.setName('Last sync')
+				.setDesc(lastSyncDesc);
+
+			// Next sync time and progress
+			if (this.plugin.settings.lastSyncTime) {
+				const timeUntilNext = this.plugin.getTimeUntilNextSync();
+				const nextSyncDesc = timeUntilNext !== null && timeUntilNext > 0
+					? 'in ' + this.plugin.formatRelativeTime(timeUntilNext)
+					: 'Overdue (will sync on next open)';
+
+				new Setting(containerEl)
+					.setName('Next sync')
+					.setDesc(nextSyncDesc);
+
+				// Progress bar
+				const intervalMs = this.plugin.settings.syncIntervalHours * 60 * 60 * 1000;
+				const elapsedMs = Date.now() - this.plugin.settings.lastSyncTime;
+				const progressPercent = Math.min(100, (elapsedMs / intervalMs) * 100);
+
+				new Setting(containerEl)
+					.setName('Progress to next sync')
+					.addProgressBar(progress => progress.setValue(progressPercent));
+			}
+		}
 
 		containerEl.createEl('h3', { text: 'File Processing' });
 
