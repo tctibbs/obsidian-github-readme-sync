@@ -29,7 +29,7 @@ readonly: true
 
 export function addReadonlyBanner(content: string, metadata: FileMetadata): string {
 	const { owner, repo, githubUrl } = metadata;
-	
+
 	const banner = `> [!WARNING] Read-Only
 > This file is synced from GitHub. Any local changes will be overwritten.
 > View source: [${owner}/${repo}](${githubUrl})
@@ -41,26 +41,61 @@ export function addReadonlyBanner(content: string, metadata: FileMetadata): stri
 		const frontmatterEnd = content.indexOf('\n---\n') + 5;
 		const frontmatter = content.substring(0, frontmatterEnd);
 		const remainingContent = content.substring(frontmatterEnd);
-		
+
 		// Check if banner already exists
 		if (remainingContent.includes('> [!WARNING] Read-Only')) {
 			return content;
 		}
-		
+
 		return frontmatter + banner + remainingContent;
 	}
-	
+
 	// Check if banner already exists
 	if (content.includes('> [!WARNING] Read-Only')) {
 		return content;
 	}
-	
+
 	return banner + content;
+}
+
+export function addBacklink(content: string, backLinkTarget: string): string {
+	const backlink = `← [[${backLinkTarget}]]\n\n`;
+
+	// Find where to insert the backlink (after frontmatter and/or read-only banner)
+	let insertPosition = 0;
+
+	// If content has frontmatter, skip past it
+	if (content.startsWith('---\n')) {
+		const frontmatterEnd = content.indexOf('\n---\n');
+		if (frontmatterEnd !== -1) {
+			insertPosition = frontmatterEnd + 5; // +5 to skip past "\n---\n"
+		}
+	}
+
+	// If content has read-only banner after frontmatter, skip past it
+	const remainingContent = content.substring(insertPosition);
+	if (remainingContent.startsWith('> [!WARNING] Read-Only')) {
+		const bannerEnd = remainingContent.indexOf('\n\n');
+		if (bannerEnd !== -1) {
+			insertPosition += bannerEnd + 2; // +2 to skip past "\n\n"
+		}
+	}
+
+	// Check if backlink already exists (check for any backlink pattern, not specific target)
+	const checkContent = content.substring(insertPosition);
+	if (checkContent.match(/^← \[\[.*?\]\]\n\n/)) {
+		return content;
+	}
+
+	// Insert backlink at the calculated position
+	return content.substring(0, insertPosition) + backlink + content.substring(insertPosition);
 }
 
 export function processFileContent(content: string, metadata: FileMetadata, options: {
 	addFrontmatter: boolean;
 	addReadonlyBanner: boolean;
+	addBacklinks: boolean;
+	backlinkTarget?: string;
 }): string {
 	let processedContent = content;
 
@@ -70,6 +105,10 @@ export function processFileContent(content: string, metadata: FileMetadata, opti
 
 	if (options.addReadonlyBanner) {
 		processedContent = addReadonlyBanner(processedContent, metadata);
+	}
+
+	if (options.addBacklinks && options.backlinkTarget) {
+		processedContent = addBacklink(processedContent, options.backlinkTarget);
 	}
 
 	return processedContent;
@@ -97,6 +136,10 @@ export function stripSyncedContent(content: string): string {
 			strippedContent = strippedContent.substring(0, bannerStart) + strippedContent.substring(bannerEnd + 2);
 		}
 	}
+
+	// Remove backlink (matches pattern: ← [[anything]]\n\n)
+	const backlinkPattern = /^← \[\[.*?\]\]\n\n/;
+	strippedContent = strippedContent.replace(backlinkPattern, '');
 
 	// Trim any leading whitespace that may have been left
 	return strippedContent.trimStart();
