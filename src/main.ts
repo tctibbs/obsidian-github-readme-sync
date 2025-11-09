@@ -316,7 +316,7 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 		for (const fileItem of syncableFiles) {
 			try {
 				await this.syncFile(owner, repo, branch, fileItem, baseFolderPath);
-				syncedFiles.add(this.getLocalFilePath(baseFolderPath, fileItem.path));
+				syncedFiles.add(this.getLocalFilePath(baseFolderPath, fileItem.path, repo));
 			} catch (error) {
 				console.error(`Failed to sync ${fileItem.path}:`, error);
 			}
@@ -335,9 +335,10 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 
 		// Get file content from GitHub
 		const content = await this.github.getFileContent(owner, repo, fileItem);
-		
+
 		// Determine local file path
-		const localFilePath = this.getLocalFilePath(baseFolderPath, fileItem.path);
+		const localFilePath = this.getLocalFilePath(baseFolderPath, fileItem.path, repo);
+		const oldFilePath = `${baseFolderPath}/${fileItem.path}`; // Original path without renaming
 
 		// Ensure parent folder exists
 		const parentPath = localFilePath.substring(0, localFilePath.lastIndexOf('/'));
@@ -367,7 +368,7 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 		// Calculate hierarchical backlink target
 		let backlinkTarget: string | undefined;
 		if (this.settings.addBacklinks) {
-			backlinkTarget = this.calculateBacklinkTarget(baseFolderPath, fileItem.path);
+			backlinkTarget = this.calculateBacklinkTarget(baseFolderPath, fileItem.path, repo);
 		}
 
 		const processedContent = processFileContent(content, metadata, {
@@ -376,6 +377,20 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 			addBacklinks: this.settings.addBacklinks,
 			backlinkTarget: backlinkTarget
 		});
+
+		// Handle file migration if renaming is enabled
+		const oldFile = this.app.vault.getAbstractFileByPath(oldFilePath);
+		const newFile = this.app.vault.getAbstractFileByPath(localFilePath);
+
+		// If renaming is enabled and old file exists at different path, migrate it
+		if (this.settings.renameReadmesToFolderNames &&
+			oldFilePath !== localFilePath &&
+			oldFile instanceof TFile &&
+			!newFile) {
+			// Rename old file to new location
+			await this.app.vault.rename(oldFile, localFilePath);
+			console.log(`Migrated ${oldFilePath} → ${localFilePath}`);
+		}
 
 		// Check if file needs updating
 		const existingFile = this.app.vault.getAbstractFileByPath(localFilePath);
@@ -398,11 +413,35 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 		}
 	}
 
-	private getLocalFilePath(baseFolderPath: string, githubPath: string): string {
+	private getLocalFilePath(baseFolderPath: string, githubPath: string, repo?: string): string {
+		// Check if renaming is enabled and this is a README file
+		if (this.settings.renameReadmesToFolderNames && this.isReadmeFile(githubPath)) {
+			const renamedPath = this.getRenamedReadmePath(githubPath, repo);
+			return `${baseFolderPath}/${renamedPath}`;
+		}
 		return `${baseFolderPath}/${githubPath}`;
 	}
 
-	private calculateBacklinkTarget(baseFolderPath: string, filePath: string): string {
+	private isReadmeFile(path: string): boolean {
+		const filename = path.split('/').pop()?.toLowerCase() || '';
+		return filename === 'readme.md';
+	}
+
+	private getRenamedReadmePath(githubPath: string, repo?: string): string {
+		const pathParts = githubPath.split('/');
+		const filename = pathParts.pop(); // Remove README.md
+
+		if (pathParts.length === 0) {
+			// Root README - use repo name
+			return repo ? `${repo}.md` : 'README.md';
+		}
+
+		// Nested README - use folder name
+		const folderName = pathParts[pathParts.length - 1];
+		return `${pathParts.join('/')}/${folderName}.md`;
+	}
+
+	private calculateBacklinkTarget(baseFolderPath: string, filePath: string, repo?: string): string {
 		// filePath examples: "README.md", "docs/README.md", "docs/guide/README.md"
 
 		// Parse the directory path
@@ -419,13 +458,26 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 		// Remove the last directory to get the parent
 		pathParts.pop();
 
-		// Build the backlink target
+		// Build the backlink target accounting for renamed files
 		if (pathParts.length === 0) {
-			// Parent is the repo root (e.g., docs/README.md -> Projects/owner/repo/README)
-			return `${baseFolderPath}/README`;
+			// Parent is the repo root
+			if (this.settings.renameReadmesToFolderNames && repo) {
+				// Link to renamed root README (e.g., Projects/owner/repo/repo)
+				return `${baseFolderPath}/${repo}`;
+			} else {
+				// Link to standard README (e.g., Projects/owner/repo/README)
+				return `${baseFolderPath}/README`;
+			}
 		} else {
-			// Parent is another nested README (e.g., docs/guide/README.md -> Projects/owner/repo/docs/README)
-			return `${baseFolderPath}/${pathParts.join('/')}/README`;
+			// Parent is another nested README
+			const parentFolder = pathParts[pathParts.length - 1];
+			if (this.settings.renameReadmesToFolderNames) {
+				// Link to renamed parent README (e.g., Projects/owner/repo/docs/docs)
+				return `${baseFolderPath}/${pathParts.join('/')}/${parentFolder}`;
+			} else {
+				// Link to standard parent README (e.g., Projects/owner/repo/docs/README)
+				return `${baseFolderPath}/${pathParts.join('/')}/README`;
+			}
 		}
 	}
 
