@@ -24,6 +24,7 @@ export interface GitHubReadmeSyncSettings {
 	addFrontmatter: boolean;
 	addReadonlyBanner: boolean;
 	addBacklinks: boolean;
+	renameReadmesToFolderNames: boolean;
 	pruneExtraneousFiles: boolean;
 	baseFolder: string;
 	syncMediaFiles: boolean;
@@ -46,6 +47,7 @@ export const DEFAULT_SETTINGS: GitHubReadmeSyncSettings = {
 	addFrontmatter: true,
 	addReadonlyBanner: true,
 	addBacklinks: true,
+	renameReadmesToFolderNames: true,
 	pruneExtraneousFiles: false,
 	baseFolder: 'Projects',
 	syncMediaFiles: false,
@@ -296,6 +298,24 @@ export class GitHubReadmeSyncSettingTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					this.plugin.settings.addReadonlyBanner = value;
 					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Rename READMEs to folder names')
+			.setDesc('Rename README.md files to their folder names for better graph view. Root README uses repo name, nested READMEs use folder name.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.renameReadmesToFolderNames)
+				.onChange(async (value) => {
+					this.plugin.settings.renameReadmesToFolderNames = value;
+					await this.plugin.saveSettings();
+					// Trigger immediate re-sync to rename/restore files
+					new Notice(`Syncing to ${value ? 'rename' : 'restore'} README files...`);
+					try {
+						await this.plugin.syncAll();
+						new Notice(`README files ${value ? 'renamed' : 'restored'} successfully!`);
+					} catch (error) {
+						new Notice(`Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+					}
 				}));
 
 		containerEl.createEl('h3', { text: 'Navigation' });
