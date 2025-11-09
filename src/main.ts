@@ -331,9 +331,17 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 			githubUrl: this.github.buildFileUrl(owner, repo, fileItem.path, branch)
 		};
 
+		// Calculate hierarchical backlink target
+		let backlinkTarget: string | undefined;
+		if (this.settings.addBacklinks) {
+			backlinkTarget = this.calculateBacklinkTarget(baseFolderPath, fileItem.path);
+		}
+
 		const processedContent = processFileContent(content, metadata, {
 			addFrontmatter: this.settings.addFrontmatter,
-			addReadonlyBanner: this.settings.addReadonlyBanner
+			addReadonlyBanner: this.settings.addReadonlyBanner,
+			addBacklinks: this.settings.addBacklinks,
+			backlinkTarget: backlinkTarget
 		});
 
 		// Check if file needs updating
@@ -342,13 +350,10 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 
 		if (existingFile && existingFile instanceof TFile) {
 			const existingContent = await this.app.vault.read(existingFile);
-			
-			// Compare original content (strip our additions for comparison)
-			const existingMetadata = extractGitHubMetadata(existingContent);
-			if (existingMetadata && existingMetadata.githubUrl === metadata.githubUrl) {
-				// File is from same source, compare actual content
-				shouldUpdate = content !== this.stripProcessedContent(existingContent);
-			}
+
+			// Compare the processed content to see if anything changed
+			// This will detect both GitHub content changes AND processing option changes
+			shouldUpdate = processedContent !== existingContent;
 		}
 
 		if (shouldUpdate) {
@@ -362,6 +367,33 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 
 	private getLocalFilePath(baseFolderPath: string, githubPath: string): string {
 		return `${baseFolderPath}/${githubPath}`;
+	}
+
+	private calculateBacklinkTarget(baseFolderPath: string, filePath: string): string {
+		// filePath examples: "README.md", "docs/README.md", "docs/guide/README.md"
+
+		// Parse the directory path
+		const pathParts = filePath.split('/');
+		const fileName = pathParts.pop(); // Remove the filename
+
+		// Check if this is a root-level README
+		if (pathParts.length === 0) {
+			// Root README links to base folder (e.g., "Projects")
+			return this.settings.baseFolder;
+		}
+
+		// For nested READMEs, link to parent directory's README
+		// Remove the last directory to get the parent
+		pathParts.pop();
+
+		// Build the backlink target
+		if (pathParts.length === 0) {
+			// Parent is the repo root (e.g., docs/README.md -> Projects/owner/repo/README)
+			return `${baseFolderPath}/README`;
+		} else {
+			// Parent is another nested README (e.g., docs/guide/README.md -> Projects/owner/repo/docs/README)
+			return `${baseFolderPath}/${pathParts.join('/')}/README`;
+		}
 	}
 
 	private stripProcessedContent(content: string): string {
@@ -383,6 +415,10 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 				strippedContent = strippedContent.substring(0, bannerStart) + strippedContent.substring(bannerEnd + 2);
 			}
 		}
+
+		// Remove backlink (matches pattern: ← [[anything]]\n\n)
+		const backlinkPattern = /^← \[\[.*?\]\]\n\n/;
+		strippedContent = strippedContent.replace(backlinkPattern, '');
 
 		return strippedContent.trimStart();
 	}

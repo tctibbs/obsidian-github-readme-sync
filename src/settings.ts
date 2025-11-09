@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import GitHubReadmeSyncPlugin from './main';
 
 export interface AutoDefaults {
@@ -23,6 +23,7 @@ export interface GitHubReadmeSyncSettings {
 	autoSync: boolean;
 	addFrontmatter: boolean;
 	addReadonlyBanner: boolean;
+	addBacklinks: boolean;
 	pruneExtraneousFiles: boolean;
 	baseFolder: string;
 	syncMediaFiles: boolean;
@@ -43,6 +44,7 @@ export const DEFAULT_SETTINGS: GitHubReadmeSyncSettings = {
 	autoSync: false,
 	addFrontmatter: true,
 	addReadonlyBanner: true,
+	addBacklinks: true,
 	pruneExtraneousFiles: false,
 	baseFolder: 'Projects',
 	syncMediaFiles: false,
@@ -258,6 +260,28 @@ export class GitHubReadmeSyncSettingTab extends PluginSettingTab {
 					this.plugin.settings.addReadonlyBanner = value;
 					await this.plugin.saveSettings();
 				}));
+
+		containerEl.createEl('h3', { text: 'Navigation' });
+
+		new Setting(containerEl)
+			.setName('Add backlinks')
+			.setDesc('Add hierarchical backlinks for graph view. Root READMEs link to base folder, nested READMEs link to parent README.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.addBacklinks)
+				.onChange(async (value) => {
+					this.plugin.settings.addBacklinks = value;
+					await this.plugin.saveSettings();
+					// Trigger immediate re-sync to update all files
+					new Notice(`Syncing to ${value ? 'add' : 'remove'} backlinks...`);
+					try {
+						await this.plugin.syncAll();
+						new Notice(`Backlinks ${value ? 'added' : 'removed'} successfully!`);
+					} catch (error) {
+						new Notice(`Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+					}
+				}));
+
+		containerEl.createEl('h3', { text: 'Additional Options' });
 
 		new Setting(containerEl)
 			.setName('Sync media files')
