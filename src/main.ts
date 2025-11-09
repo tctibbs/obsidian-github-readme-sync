@@ -25,7 +25,7 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 
 		// Add status bar item
 		this.statusBarItem = this.addStatusBarItem();
-		this.updateStatusBar('Ready');
+		this.updateStatusBarWithCountdown();
 
 		// Add command
 		this.addCommand({
@@ -36,6 +36,18 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 
 		// Setup auto-sync if enabled
 		if (this.settings.autoSync && this.settings.syncIntervalHours > 0) {
+			// Check if a sync is overdue (e.g., Obsidian was closed during interval)
+			if (this.settings.lastSyncTime) {
+				const elapsedMs = Date.now() - this.settings.lastSyncTime;
+				const intervalMs = this.settings.syncIntervalHours * 60 * 60 * 1000;
+
+				if (elapsedMs >= intervalMs) {
+					console.log('Sync is overdue, syncing now...');
+					// Don't await - let it run in background
+					this.syncAll();
+				}
+			}
+
 			this.setupAutoSync();
 		}
 
@@ -54,10 +66,14 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
 		
 		// Migration: convert old syncIntervalMinutes to syncIntervalHours
-		if (loadedData && 'syncIntervalMinutes' in loadedData && !('syncIntervalHours' in loadedData)) {
-			this.settings.syncIntervalHours = Math.max(0.1, (loadedData as any).syncIntervalMinutes / 60);
+		if (loadedData && 'syncIntervalMinutes' in loadedData) {
+			if (!('syncIntervalHours' in loadedData)) {
+				this.settings.syncIntervalHours = Math.max(0.1, (loadedData as any).syncIntervalMinutes / 60);
+				console.log(`Migrated sync interval from ${(loadedData as any).syncIntervalMinutes} minutes to ${this.settings.syncIntervalHours} hours`);
+			}
+			// Clean up old field
+			delete (this.settings as any).syncIntervalMinutes;
 			await this.saveSettings();
-			console.log(`Migrated sync interval from ${(loadedData as any).syncIntervalMinutes} minutes to ${this.settings.syncIntervalHours} hours`);
 		}
 		
 		// Initialize GitHub API if token is available
@@ -99,6 +115,21 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 		this.statusBarItem.setText(`GitHub Sync: ${status}`);
 	}
 
+	private updateStatusBarWithCountdown() {
+		// Update status bar with countdown
+		if (this.settings.autoSync && this.settings.lastSyncTime) {
+			const timeUntilNext = this.getTimeUntilNextSync();
+			if (timeUntilNext !== null && timeUntilNext > 0) {
+				const formattedTime = this.formatRelativeTime(timeUntilNext);
+				this.updateStatusBar(`Next in ${formattedTime}`);
+			} else {
+				this.updateStatusBar('Sync overdue');
+			}
+		} else {
+			this.updateStatusBar('Ready');
+		}
+	}
+
 	async syncAll() {
 		if (!this.github) {
 			new Notice('GitHub token not configured');
@@ -137,15 +168,17 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 
 			// Update the list of synced repositories for future cleanup
 			this.settings.lastSyncedRepos = currentRepoIds;
+			// Save timestamp of successful sync
+			this.settings.lastSyncTime = Date.now();
 			await this.saveSettings();
 
 			// Show completion message
-			const message = errorCount === 0 
+			const message = errorCount === 0
 				? `Synced ${syncedCount} repositories`
 				: `Synced ${syncedCount} repositories (${errorCount} errors)`;
-			
+
 			new Notice(message);
-			this.updateStatusBar(`Complete: ${syncedCount} repos`);
+			this.updateStatusBarWithCountdown();
 
 		} catch (error) {
 			console.error('Sync failed:', error);
@@ -598,5 +631,44 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 
 		// Now delete the empty folder
 		await this.app.vault.delete(folder);
+	}
+
+	getTimeSinceLastSync(): number | null {
+		if (!this.settings.lastSyncTime) {
+			return null;
+		}
+		return Date.now() - this.settings.lastSyncTime;
+	}
+
+	getTimeUntilNextSync(): number | null {
+		if (!this.settings.lastSyncTime || !this.settings.autoSync) {
+			return null;
+		}
+		const intervalMs = this.settings.syncIntervalHours * 60 * 60 * 1000;
+		const elapsedMs = Date.now() - this.settings.lastSyncTime;
+		const remainingMs = intervalMs - elapsedMs;
+		return remainingMs > 0 ? remainingMs : 0;
+	}
+
+	formatRelativeTime(ms: number): string {
+		const seconds = Math.floor(ms / 1000);
+		const minutes = Math.floor(seconds / 60);
+		const hours = Math.floor(minutes / 60);
+		const days = Math.floor(hours / 24);
+
+		if (days > 0) {
+			return `${days}d ${hours % 24}h`;
+		} else if (hours > 0) {
+			return `${hours}h ${minutes % 60}m`;
+		} else if (minutes > 0) {
+			return `${minutes}m`;
+		} else {
+			return `${seconds}s`;
+		}
+	}
+
+	formatTimeAgo(timestamp: number): string {
+		const ms = Date.now() - timestamp;
+		return this.formatRelativeTime(ms) + ' ago';
 	}
 }
