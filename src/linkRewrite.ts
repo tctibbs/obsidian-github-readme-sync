@@ -58,6 +58,113 @@ export function addReadonlyBanner(content: string, metadata: FileMetadata): stri
 	return banner + content;
 }
 
+/**
+ * Resolve a relative path from the current file's directory.
+ * Examples:
+ *   resolvePath("docs/guide.md", "./api.md") -> "docs/api.md"
+ *   resolvePath("docs/guide.md", "../README.md") -> "README.md"
+ *   resolvePath("README.md", "./docs/guide.md") -> "docs/guide.md"
+ */
+function resolvePath(currentFilePath: string, relativePath: string): string {
+	// Get the directory of the current file
+	const pathParts = currentFilePath.split('/');
+	pathParts.pop(); // Remove filename
+
+	// Handle the relative path
+	const relParts = relativePath.split('/');
+
+	for (const part of relParts) {
+		if (part === '.' || part === '') {
+			continue;
+		} else if (part === '..') {
+			pathParts.pop();
+		} else {
+			pathParts.push(part);
+		}
+	}
+
+	return pathParts.join('/');
+}
+
+/**
+ * Convert relative markdown links to Obsidian wikilinks.
+ *
+ * Examples:
+ *   [Guide](./docs/guide.md) -> [[guide]]
+ *   [API Reference](../api.md#endpoints) -> [[api#endpoints|API Reference]]
+ *   [External](https://example.com) -> unchanged
+ */
+export function rewriteMarkdownLinks(
+	content: string,
+	currentFilePath: string,
+	renameReadmes: boolean,
+	repo: string
+): string {
+	// Pattern: [text](path) but NOT ![text](path) (images) and NOT external URLs
+	// Captures: 1=link text, 2=path (possibly with anchor)
+	const linkPattern = /(?<!!)\[([^\]]+)\]\((?!https?:\/\/)(?!#)([^)]+)\)/g;
+
+	return content.replace(linkPattern, (match, linkText: string, linkPath: string) => {
+		// Skip if path doesn't look like a markdown file reference
+		// (could be an anchor-only link or something else)
+		if (!linkPath.includes('.md') && !linkPath.includes('#')) {
+			return match;
+		}
+
+		// Separate the path and anchor
+		let targetPath = linkPath;
+		let anchor = '';
+
+		if (linkPath.includes('#')) {
+			const hashIndex = linkPath.indexOf('#');
+			targetPath = linkPath.substring(0, hashIndex);
+			anchor = linkPath.substring(hashIndex);
+		}
+
+		// If it's just an anchor (same-file link), keep as wikilink
+		if (!targetPath) {
+			return `[[${anchor}|${linkText}]]`;
+		}
+
+		// Skip non-markdown files
+		if (!targetPath.endsWith('.md')) {
+			return match;
+		}
+
+		// Resolve the relative path
+		const resolvedPath = resolvePath(currentFilePath, targetPath);
+
+		// Get just the filename without extension
+		let filename = resolvedPath.split('/').pop() || '';
+		filename = filename.replace(/\.md$/, '');
+
+		// Handle README renaming if enabled
+		if (renameReadmes && filename.toLowerCase() === 'readme') {
+			// Get the folder name for the README
+			const resolvedParts = resolvedPath.split('/');
+			resolvedParts.pop(); // Remove README.md
+
+			if (resolvedParts.length === 0) {
+				// Root README - use repo name
+				filename = repo;
+			} else {
+				// Nested README - use folder name
+				filename = resolvedParts[resolvedParts.length - 1];
+			}
+		}
+
+		// Build the wikilink
+		const target = filename + anchor;
+
+		// Use alias if link text differs from filename (case-insensitive)
+		if (linkText.toLowerCase() === filename.toLowerCase()) {
+			return `[[${target}]]`;
+		}
+
+		return `[[${target}|${linkText}]]`;
+	});
+}
+
 export function addBacklink(content: string, backLinkTarget: string): string {
 	const backlink = `← [[${backLinkTarget}]]\n\n`;
 
@@ -81,13 +188,15 @@ export function addBacklink(content: string, backLinkTarget: string): string {
 		}
 	}
 
-	// Check if backlink already exists (check for any backlink pattern, not specific target)
+	// Replace existing backlink if present, or insert new one
 	const checkContent = content.substring(insertPosition);
-	if (checkContent.match(/^← \[\[.*?\]\]\n\n/)) {
-		return content;
+	const existingBacklinkMatch = checkContent.match(/^← \[\[.*?\]\]\n\n/);
+	if (existingBacklinkMatch) {
+		// Replace existing backlink with new one
+		return content.substring(0, insertPosition) + backlink + checkContent.substring(existingBacklinkMatch[0].length);
 	}
 
-	// Insert backlink at the calculated position
+	// Insert new backlink at the calculated position
 	return content.substring(0, insertPosition) + backlink + content.substring(insertPosition);
 }
 
@@ -96,8 +205,20 @@ export function processFileContent(content: string, metadata: FileMetadata, opti
 	addReadonlyBanner: boolean;
 	addBacklinks: boolean;
 	backlinkTarget?: string;
+	convertLinks: boolean;
+	renameReadmes: boolean;
 }): string {
 	let processedContent = content;
+
+	// Convert markdown links to wikilinks first (before adding other content)
+	if (options.convertLinks) {
+		processedContent = rewriteMarkdownLinks(
+			processedContent,
+			metadata.path,
+			options.renameReadmes,
+			metadata.repo
+		);
+	}
 
 	if (options.addFrontmatter) {
 		processedContent = addFrontmatterIfMissing(processedContent, metadata);

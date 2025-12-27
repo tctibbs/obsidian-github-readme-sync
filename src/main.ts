@@ -375,7 +375,9 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 			addFrontmatter: this.settings.addFrontmatter,
 			addReadonlyBanner: this.settings.addReadonlyBanner,
 			addBacklinks: this.settings.addBacklinks,
-			backlinkTarget: backlinkTarget
+			backlinkTarget: backlinkTarget,
+			convertLinks: this.settings.convertLinksToWikilinks,
+			renameReadmes: this.settings.renameReadmesToFolderNames
 		});
 
 		// Handle file migration if renaming is enabled
@@ -442,42 +444,24 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 	}
 
 	private calculateBacklinkTarget(baseFolderPath: string, filePath: string, repo?: string): string {
-		// filePath examples: "README.md", "docs/README.md", "docs/guide/README.md"
+		// filePath examples: "README.md", "docs/README.md", "agents/backend-architect.md"
+		// Strategy: Always link to repo root README to guarantee valid links
+		// This creates a hub-and-spoke pattern where all files connect to the main README
 
-		// Parse the directory path
 		const pathParts = filePath.split('/');
-		const fileName = pathParts.pop(); // Remove the filename
+		pathParts.pop(); // Remove the filename
 
-		// Check if this is a root-level README
+		// Root-level files link to base folder
 		if (pathParts.length === 0) {
-			// Root README links to base folder (e.g., "Projects")
 			return this.settings.baseFolder;
 		}
 
-		// For nested READMEs, link to parent directory's README
-		// Remove the last directory to get the parent
-		pathParts.pop();
-
-		// Build the backlink target accounting for renamed files
-		if (pathParts.length === 0) {
-			// Parent is the repo root
-			if (this.settings.renameReadmesToFolderNames && repo) {
-				// Link to renamed root README (e.g., Projects/owner/repo/repo)
-				return `${baseFolderPath}/${repo}`;
-			} else {
-				// Link to standard README (e.g., Projects/owner/repo/README)
-				return `${baseFolderPath}/README`;
-			}
+		// All nested files link to repo root README
+		// This ensures backlinks are always valid (no broken links to missing parent READMEs)
+		if (this.settings.renameReadmesToFolderNames && repo) {
+			return repo;
 		} else {
-			// Parent is another nested README
-			const parentFolder = pathParts[pathParts.length - 1];
-			if (this.settings.renameReadmesToFolderNames) {
-				// Link to renamed parent README (e.g., Projects/owner/repo/docs/docs)
-				return `${baseFolderPath}/${pathParts.join('/')}/${parentFolder}`;
-			} else {
-				// Link to standard parent README (e.g., Projects/owner/repo/docs/README)
-				return `${baseFolderPath}/${pathParts.join('/')}/README`;
-			}
+			return 'README';
 		}
 	}
 

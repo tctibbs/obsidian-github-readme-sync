@@ -24,6 +24,7 @@ export interface GitHubReadmeSyncSettings {
 	addFrontmatter: boolean;
 	addReadonlyBanner: boolean;
 	addBacklinks: boolean;
+	convertLinksToWikilinks: boolean; // Convert markdown links to Obsidian wikilinks
 	renameReadmesToFolderNames: boolean;
 	pruneExtraneousFiles: boolean;
 	baseFolder: string;
@@ -47,6 +48,7 @@ export const DEFAULT_SETTINGS: GitHubReadmeSyncSettings = {
 	addFrontmatter: true,
 	addReadonlyBanner: true,
 	addBacklinks: true,
+	convertLinksToWikilinks: true,
 	renameReadmesToFolderNames: true,
 	pruneExtraneousFiles: false,
 	baseFolder: 'Projects',
@@ -333,6 +335,24 @@ export class GitHubReadmeSyncSettingTab extends PluginSettingTab {
 					try {
 						await this.plugin.syncAll();
 						new Notice(`Backlinks ${value ? 'added' : 'removed'} successfully!`);
+					} catch (error) {
+						new Notice(`Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+					}
+				}));
+
+		new Setting(containerEl)
+			.setName('Convert links to wikilinks')
+			.setDesc('Convert relative markdown links to Obsidian wikilinks for proper graph integration.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.convertLinksToWikilinks)
+				.onChange(async (value) => {
+					this.plugin.settings.convertLinksToWikilinks = value;
+					await this.plugin.saveSettings();
+					// Trigger immediate re-sync to update all files
+					new Notice(`Syncing to ${value ? 'convert' : 'restore'} links...`);
+					try {
+						await this.plugin.syncAll();
+						new Notice(`Links ${value ? 'converted to wikilinks' : 'restored to markdown'} successfully!`);
 					} catch (error) {
 						new Notice(`Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
 					}
