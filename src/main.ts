@@ -42,7 +42,6 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 				const intervalMs = this.settings.syncIntervalHours * 60 * 60 * 1000;
 
 				if (elapsedMs >= intervalMs) {
-					console.log('Sync is overdue, syncing now...');
 					// Don't await - let it run in background
 					this.syncAll();
 				}
@@ -50,15 +49,12 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 
 			this.setupAutoSync();
 		}
-
-		console.log('GitHub Readme Sync plugin loaded');
 	}
 
 	onunload() {
 		if (this.syncInterval) {
 			window.clearInterval(this.syncInterval);
 		}
-		console.log('GitHub Readme Sync plugin unloaded');
 	}
 
 	async loadSettings() {
@@ -69,7 +65,6 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 		if (loadedData && 'syncIntervalMinutes' in loadedData) {
 			if (!('syncIntervalHours' in loadedData)) {
 				this.settings.syncIntervalHours = Math.max(0.1, (loadedData as any).syncIntervalMinutes / 60);
-				console.log(`Migrated sync interval from ${(loadedData as any).syncIntervalMinutes} minutes to ${this.settings.syncIntervalHours} hours`);
 			}
 			// Clean up old field
 			delete (this.settings as any).syncIntervalMinutes;
@@ -391,7 +386,6 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 			!newFile) {
 			// Rename old file to new location
 			await this.app.vault.rename(oldFile, localFilePath);
-			console.log(`Migrated ${oldFilePath} → ${localFilePath}`);
 		}
 
 		// Check if file needs updating
@@ -573,25 +567,16 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 
 		// Migration: scan existing folders if we have fewer tracked than current filters suggest
 		const existingRepoIds = await this.scanExistingRepositories();
-		console.log('Found existing folders:', existingRepoIds);
 		
 		// If we have more existing folders than our tracking suggests, clean up extras
 		const untrackedExistingRepos = existingRepoIds.filter(repoId => !currentRepoIds.includes(repoId));
 		if (untrackedExistingRepos.length > 0) {
-			console.log('Migration: Found untracked repos to clean up:', untrackedExistingRepos);
 			removedRepoIds = [...removedRepoIds, ...untrackedExistingRepos];
 		}
-
-		console.log('Cleanup debug:');
-		console.log('Previous repos:', previousRepoIds);
-		console.log('Current repos:', currentRepoIds);
-		console.log('Removed repos:', removedRepoIds);
 
 		if (removedRepoIds.length === 0) {
 			return;
 		}
-
-		console.log(`Cleaning up ${removedRepoIds.length} removed repositories:`, removedRepoIds);
 
 		for (const repoId of removedRepoIds) {
 			const [owner, repo] = repoId.split('/');
@@ -603,7 +588,6 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 			if (repoFolder && repoFolder instanceof TFolder) {
 				try {
 					await this.recursiveDeleteFolder(repoFolder);
-					console.log(`Deleted repository folder: ${repoFolderPath}`);
 				} catch (error) {
 					console.error(`Failed to delete repository folder ${repoFolderPath}:`, error);
 				}
@@ -616,7 +600,6 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 			if (ownerFolder && ownerFolder instanceof TFolder && ownerFolder.children.length === 0) {
 				try {
 					await this.app.vault.delete(ownerFolder);
-					console.log(`Deleted empty owner folder: ${ownerFolderPath}`);
 				} catch (error) {
 					console.error(`Failed to delete owner folder ${ownerFolderPath}:`, error);
 				}
@@ -651,7 +634,6 @@ export default class GitHubReadmeSyncPlugin extends Plugin {
 			}
 		}
 
-		console.log('Scanned existing repositories:', existingRepoIds);
 		return existingRepoIds;
 	}
 
